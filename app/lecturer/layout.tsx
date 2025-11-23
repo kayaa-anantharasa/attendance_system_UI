@@ -25,7 +25,8 @@ export default function LecturerLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
 
  const menuItems: MenuItem[] = [
-  { name: "Dashboard", path: "/lecturer/dashboard", icon: <FiHome /> }
+  { name: "Dashboard", path: "/lecturer/dashboard", icon: <FiHome /> },
+  { name: "Sessions", path: "/lecturer/attendance", icon: <FiBook /> }
 ];
 
   useEffect(() => {

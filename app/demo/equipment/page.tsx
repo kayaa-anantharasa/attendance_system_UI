@@ -2,98 +2,121 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-interface Equipment {
-    name: string;
-  id: number;
-  type: string;
-  total_qty: number;
-  available_qty: number;
-}
-
 interface Request {
   id: number;
   equipment_id: number;
-  user_id: number;
+  name: string;      // Matches 'e.name AS name' from backend
+  user_name: string; // Matches 'u.name AS user_name' from backend
+  request_date: string;
+  qty: number;
   status: string;
 }
 
-export default function EquipmentDashboard() {
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+export default function EquipmentRequestsAdmin() {
   const [requests, setRequests] = useState<Request[]>([]);
-  const [selectedEquipment, setSelectedEquipment] = useState<number>(0);
- useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (!userStr) return;
-    const parsedUser = JSON.parse(userStr);
-    setUser(parsedUser);
-  }, []); // runs only on client
-    const [user, setUser] = useState<{ id: number; name: string }>({ id: 0, name: "" });
 
-  const fetchEquipment = async () => {
-    const res = await axios.get("http://localhost:5000/api/equipment");
-    setEquipmentList(res.data);
-  };
-
+  // Fetch all equipment requests
   const fetchRequests = async () => {
-    const res = await axios.get(`http://localhost:5000/api/equipment/request`);
-    setRequests(res.data);
-  };
-
-  const handleRequest = async () => {
-    if (!selectedEquipment) return alert("Select equipment");
-    await axios.post("http://localhost:5000/api/equipment/request", {
-      equipment_id: selectedEquipment,
-      user_id: user.id,
-    });
-    alert("Request submitted!");
-    fetchRequests();
+    try {
+      const res = await axios.get("http://localhost:5000/api/equipment/request");
+      setRequests(res.data);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
-    fetchEquipment();
     fetchRequests();
   }, []);
 
+  // Approve a request
+  const handleApprove = async (id: number) => {
+    try {
+      await axios.post(`http://localhost:5000/api/equipment/request/${id}/approve`);
+      alert("Request approved");
+      fetchRequests();
+    } catch (err: any) {
+      // Show the validation message from the backend
+      const msg = err.response?.data?.message || "Failed to approve request";
+      alert(msg); 
+    }
+  };
+
+  // Reject a request
+  const handleReject = async (id: number) => {
+    if(!confirm("Are you sure you want to reject this request?")) return;
+    
+    try {
+      await axios.post(`http://localhost:5000/api/equipment/request/${id}/reject`);
+      alert("Request rejected");
+      fetchRequests();
+    } catch (err) {
+      alert("Failed to reject request");
+      console.error(err);
+    }
+  };
+
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Lab Equipment</h2>
-      <select
-        className="border p-2 mb-2"
-        value={selectedEquipment}
-        onChange={e => setSelectedEquipment(Number(e.target.value))}
-      >
-        <option value={0}>Select Equipment</option>
-        {equipmentList.map(e => (
-          <option key={e.id} value={e.id}>
-            {e.name} (Available: {e.available_qty})
-          </option>
-        ))}
-      </select>
-      <button onClick={handleRequest} className="px-3 py-1 bg-blue-600 text-white rounded">
-        Request Equipment
-      </button>
+      <h2 className="text-2xl font-bold mb-4">Equipment Requests</h2>
 
-      <h3 className="mt-6 font-semibold">Requests</h3>
-      <table className="w-full border mt-2 text-sm">
-        <thead>
-          <tr className="bg-gray-200">
-            <th className="border p-2">Equipment</th>
-            <th className="border p-2">Status</th>
-          </tr>
-        </thead>
-     <tbody>
-  {requests.map(r => {
-    const eq = equipmentList.find(e => e.id === r.equipment_id);
-    return (
-      <tr key={r.id}>
-        <td className="border p-2">{eq ? eq.name : "Unknown"}</td>
-        <td className="border p-2 font-semibold">{r.status}</td>
-      </tr>
-    );
-  })}
-</tbody>
-
-      </table>
+      {requests.length === 0 ? (
+        <p>No requests yet.</p>
+      ) : (
+        <table className="w-full border-collapse border text-sm shadow-sm">
+          <thead>
+            <tr className="bg-gray-200 text-left">
+              <th className="border p-2">User</th>
+              <th className="border p-2">Equipment</th>
+              <th className="border p-2">Qty</th>
+              <th className="border p-2">Date</th>
+              <th className="border p-2">Status</th>
+              <th className="border p-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.map(r => (
+              <tr key={r.id} className="hover:bg-gray-50">
+                <td className="border p-2">{r.user_name}</td>
+                {/* Use r.name directly from backend response */}
+                <td className="border p-2">{r.name}</td> 
+                <td className="border p-2">{r.qty}</td>
+                <td className="border p-2">
+                    {new Date(r.request_date).toLocaleDateString()}
+                </td>
+                
+                <td className={`border p-2 font-bold ${
+                  r.status === "approved" ? "text-green-600" :
+                  r.status === "rejected" ? "text-red-600" :
+                  "text-yellow-600"
+                }`}>
+                  {r.status.toUpperCase()}
+                </td>
+                
+                <td className="border p-2 flex gap-2">
+                  {r.status === "pending" && (
+                    <>
+                      <button
+                        onClick={() => handleApprove(r.id)}
+                        className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(r.id)}
+                        className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+                  {r.status !== "pending" && <span className="text-gray-400 text-xs">Decided</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

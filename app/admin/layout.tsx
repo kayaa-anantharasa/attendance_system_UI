@@ -42,7 +42,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   { name: "Locations", path: "/admin/location", icon: <FiMapPin /> },
 
   { name: "Manage", path: "/admin/manage", icon: <FiSettings /> },
-  { name: "Equipment", path: "/admin/equipment", icon: <FiSettings /> },
+  { name: "Equipment", path: "/admin/equipment", icon: <FiGrid /> },
+  { name: "Lab", path: "/admin/lab", icon: <FiLayers /> },
 ];
 
   useEffect(() => {

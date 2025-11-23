@@ -6,6 +6,7 @@ import {
   FiMenu,
   FiLogOut,
   FiHome,
+  FiSettings
 } from "react-icons/fi";
 
 interface MenuItem {
@@ -20,9 +21,10 @@ export default function DemoLayout({ children }: { children: ReactNode }) {
 
  const menuItems: MenuItem[] = [
   { name: "Dashboard", path: "/demo/dashboard", icon: <FiHome /> },
+  { name: "Attendance", path: "/demo/attendance", icon: <FiHome /> },
   { name: "Labs", path: "/demo/lab", icon: <FiHome /> },
   { name: "Equipment", path: "/demo/equipment", icon: <FiHome /> },
-
+  
 ];
 
   useEffect(() => {

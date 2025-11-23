@@ -4,8 +4,8 @@ import axios from "axios";
 
 interface Booking {
   id: number;
-  lab_name: string;   // From Backend JOIN
-  user_name: string;  // From Backend JOIN
+  lab_name: string;   
+  user_name: string; 
   session_date: string;
   start_time: string;
   end_time: string;
@@ -36,13 +36,12 @@ export default function LabRequestsAdmin() {
       alert("Booking approved");
       fetchBookings();
     } catch (err: any) {
-      // Show error message from backend (e.g., "Time slot already approved")
+      
       const msg = err.response?.data?.message || "Failed to approve booking";
       alert(msg); 
     }
   };
 
-  // Reject a booking
   const handleReject = async (id: number) => {
     if(!confirm("Reject this booking?")) return;
     try {

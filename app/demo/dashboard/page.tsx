@@ -1,220 +1,127 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import QrScanner from "react-qr-barcode-scanner"; // modern scanner
+import { QrCode, Calendar, ClipboardCheck, MonitorPlay } from "lucide-react";
 
-interface Session {
-  id: number;
-  subject_name: string;
-  subject_code: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  lecturer_name: string;
-}
+export default function DemoDashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-interface Attendance {
-  id: number;
-  student_id: number;
-  student_name: string;
-  status: string;
-  scanned_by: string;
-  scan_time: string;
-}
-
-export default function AssistantSessions() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [openSessionId, setOpenSessionId] = useState<number | null>(null);
-  const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
-  const [scannedData, setScannedData] = useState<string | null>(null);
-
-  // Fetch assistant sessions
   useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (!userStr) return;
-    const user = JSON.parse(userStr);
-
-    const fetchSessions = async () => {
-      try {
-        if (!user.id) return;
-        const res = await axios.get<Session[]>(
-          `http://localhost:5000/api/assistant/${user.id}/sessions`
-        );
-        setSessions(res.data);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to fetch sessions");
-      }
-    };
-
-    fetchSessions();
-  }, []);
-
-  // Fetch attendance for a session
-  const fetchAttendance = async (sessionId: number) => {
-    try {
-      const res = await axios.get<Attendance[]>(
-        `http://localhost:5000/api/assistant/session/${sessionId}`
-      );
-      setAttendanceList(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to fetch attendance");
-    }
-  };
-
-  // Open modal and load attendance
-  const openModal = (sessionId: number) => {
-    setOpenSessionId(sessionId);
-    fetchAttendance(sessionId);
-    setScannedData(null);
-  };
-
-  // Mark attendance
-  const markAttendance = async (studentId: string) => {
-    if (!openSessionId) return;
-    try {
+    const fetchData = async () => {
       const userStr = localStorage.getItem("user");
       if (!userStr) return;
       const user = JSON.parse(userStr);
 
-      await axios.post(`http://localhost:5000/api/assistant/attendance`, {
-        sessionId: openSessionId,
-        studentId,
-        scannedBy: user.id,
-      });
+      try {
+        const res = await axios.get(`http://localhost:5000/api/assistant/stats/${user.id}`);
+        setStats(res.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
-      setScannedData(null);
-      fetchAttendance(openSessionId);
-      alert("Attendance marked successfully!");
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to mark attendance");
-    }
-  };
-
-  // Handle QR scan
-  const handleScan = (data: string | null) => {
-    if (!data) return;
-    setScannedData(data);
-
-    // Parse the QR data (assuming format: UserID:S001;Name:Hello;Email:hello@gmail.com)
-    const match = data.match(/UserID:([^;]+)/);
-    if (match && match[1]) {
-      const studentId = match[1];
-      markAttendance(studentId);
-    } else {
-      alert("Invalid QR Code format!");
-    }
-  };
+  if (loading) return <div className="p-10 text-center">Loading Dashboard...</div>;
 
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">My Sessions</h2>
+    <div className="min-h-screen bg-gray-50 p-6 md:p-8">
+      
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">Assistant Dashboard</h1>
+        <p className="text-gray-500">Manage lab sessions and attendance.</p>
+      </div>
 
-      {sessions.length === 0 ? (
-        <p>No sessions available.</p>
-      ) : (
-        <table className="border-collapse border w-full">
-          <thead>
-            <tr className="bg-gray-200">
-              <th className="border p-2">Subject</th>
-              <th className="border p-2">Code</th>
-              <th className="border p-2">Date</th>
-              <th className="border p-2">Start Time</th>
-              <th className="border p-2">End Time</th>
-              <th className="border p-2">Lecturer</th>
-              <th className="border p-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((s) => (
-              <tr key={s.id}>
-                <td className="border p-2">{s.subject_name}</td>
-                <td className="border p-2">{s.subject_code}</td>
-                <td className="border p-2">{s.date}</td>
-                <td className="border p-2">{s.start_time}</td>
-                <td className="border p-2">{s.end_time}</td>
-                <td className="border p-2">{s.lecturer_name}</td>
-                <td className="border p-2">
-                  <button
-                    className="px-3 py-1 bg-blue-600 text-white rounded"
-                    onClick={() => openModal(s.id)}
-                  >
-                    Take Attendance
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {/* Attendance Modal */}
-      {openSessionId && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow w-96">
-            <h3 className="text-xl font-semibold mb-4">
-              Attendance for Session {openSessionId}
-            </h3>
-
-            {/* QR Scanner */}
-            <div className="mb-4">
-             <QrScanner
-  onUpdate={(err, result) => {
-    if (result) {
-      // Use the public method getText() to get the scanned content
-      const scannedText = result.getText();
-      handleScan(scannedText);
-    }
-    if (err) console.error(err);
-  }}
-  facingMode="environment"
-  
-/>
-
-              {scannedData && (
-                <p className="mt-2 p-2 bg-green-100 border border-green-300 rounded">
-                  Scanned Data: {scannedData}
-                </p>
-              )}
-            </div>
-
-            {/* Attendance List */}
-            {attendanceList.length === 0 ? (
-              <p>No attendance records yet.</p>
-            ) : (
-              <table className="w-full border-collapse border mb-4 text-sm">
-                <thead>
-                  <tr className="bg-gray-200">
-                    <th className="border p-2">Student Name</th>
-                    <th className="border p-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendanceList.map((a) => (
-                    <tr key={a.id}>
-                      <td className="border p-2">{a.student_name}</td>
-                      <td className="border p-2 font-semibold text-green-600">
-                        {a.status}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            <div className="flex justify-end">
-              <button
-                className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-500 text-white"
-                onClick={() => setOpenSessionId(null)}
-              >
-                Close
-              </button>
-            </div>
+      {/* --- KEY METRICS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        
+        {/* Metric 1 */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-indigo-500 flex items-center">
+          <div className="p-3 bg-indigo-50 rounded-full mr-4 text-indigo-600">
+            <MonitorPlay />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">My Total Sessions</p>
+            <h3 className="text-2xl font-bold text-gray-800">{stats.totalSessions}</h3>
           </div>
         </div>
-      )}
+
+        {/* Metric 2 */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-500 flex items-center">
+          <div className="p-3 bg-emerald-50 rounded-full mr-4 text-emerald-600">
+            <ClipboardCheck />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Students Scanned Today</p>
+            <h3 className="text-2xl font-bold text-gray-800">{stats.scannedToday}</h3>
+          </div>
+        </div>
+
+        {/* Metric 3: Quick Action */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-xl shadow-md text-white flex flex-col justify-center items-center text-center">
+            <h3 className="font-bold text-lg mb-2">Ready to start?</h3>
+            <button 
+              onClick={() => window.location.href = '/demo/attendace'} // Point to your scanner page
+              className="bg-white text-indigo-700 px-6 py-2 rounded-full font-bold shadow hover:bg-gray-100 transition flex items-center"
+            >
+              <QrCode className="w-4 h-4 mr-2" /> Scan Attendance
+            </button>
+        </div>
+      </div>
+
+      {/* --- UPCOMING SCHEDULE --- */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center">
+          <Calendar className="w-5 h-5 mr-2 text-gray-500" /> Upcoming Sessions
+        </h3>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50 text-gray-600 text-sm uppercase">
+              <tr>
+                <th className="p-3">Subject</th>
+                <th className="p-3">Location</th>
+                <th className="p-3">Time</th>
+                <th className="p-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm text-gray-700">
+              {stats.upcomingSessions.length === 0 ? (
+                <tr><td colSpan={4} className="p-4 text-center text-gray-400">No upcoming sessions found.</td></tr>
+              ) : (
+                stats.upcomingSessions.map((sess: any) => (
+                  <tr key={sess.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="p-3 font-medium">{sess.subject_name}</td>
+                    <td className="p-3">{sess.location_name}</td>
+                    <td className="p-3">
+                        {sess.start_time} <br/>
+                        <span className="text-xs text-gray-400">
+                            {new Date().toDateString() === new Date(sess.date).toDateString() 
+                                ? "Today" 
+                                : new Date(sess.date).toLocaleDateString()}
+                        </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button 
+                        onClick={() => window.location.href = '/demo/sessions'}
+                        className="text-indigo-600 hover:underline text-xs font-bold"
+                      >
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }

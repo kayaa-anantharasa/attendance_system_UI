@@ -1,330 +1,196 @@
 'use client';
+
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell 
+} from 'recharts';
+import { BookOpen, Calendar, Users, PlusCircle, ArrowRight } from "lucide-react"; // Icons
 
-interface Subject {
-  id: number;
-  subject_id: number;
-  subject_name: string;
-  subject_code: string;
-}
-
-interface Session {
-  id: number;
-  subject_name: string;
-  subject_code: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  location_id: number;
-  assistant_name?: string;
-}
-
-interface Attendance {
-  student_id: string;
-  student_name: string;
-  status: string;
-  scan_time: string;
+// Interfaces
+interface DashboardStats {
+  totalSubjects: number;
+  totalSessions: number;
+  chartData: { subject_code: string; attendance_count: number }[];
+  upcomingSessions: { date: string; start_time: string; subject_name: string }[];
 }
 
 export default function LecturerDashboard() {
-  const [lecturerId, setLecturerId] = useState<number | null>(null);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [showAddSession, setShowAddSession] = useState(false);
-  const [assistants, setAssistants] = useState<{id: number, name: string}[]>([]);
-  const [locations, setLocations] = useState<{id: number, name: string}[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
-  const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
-
-  const [assignSubjectId, setAssignSubjectId] = useState<number>(0);
-  const [newSession, setNewSession] = useState({
-    subject_id: 0,
-    assistant_id: 0,
-    location_id: 1,
-    date: "",
-    start_time: "",
-    end_time: "",
+  const [stats, setStats] = useState<DashboardStats>({
+    totalSubjects: 0,
+    totalSessions: 0,
+    chartData: [],
+    upcomingSessions: []
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
+    const fetchStats = async () => {
+      const userStr = localStorage.getItem("user");
+      if (!userStr) return;
       const user = JSON.parse(userStr);
-      setLecturerId(user.id);
-    }
+
+      try {
+        const res = await axios.get(`http://localhost:5000/api/lecturer/dashboard-stats/${user.id}`);
+        setStats(res.data);
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
   }, []);
 
-  useEffect(() => {
-    if (!lecturerId) return;
-    fetchSubjects();
-    fetchSessions();
-    fetchAssistants();
-    fetchLocations();
-  }, [lecturerId]);
-
-  const fetchSubjects = async () => {
-    try {
-      const res = await axios.get(`http://localhost:5000/api/lecturer/subjects/${lecturerId}`);
-      setSubjects(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchSessions = async () => {
-    try {
-      const res = await axios.get(`http://localhost:5000/api/lecturer/sessions/${lecturerId}`);
-      setSessions(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchAssistants = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/lecturer/assistants");
-      setAssistants(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchLocations = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/locations");
-      setLocations(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAssignSubject = async () => {
-    if (!assignSubjectId || !lecturerId) return alert("Select a subject");
-    try {
-      await axios.post("http://localhost:5000/api/lecturer/assign-subject", {
-        lecturer_id: lecturerId,
-        subject_id: assignSubjectId
-      });
-      alert("Subject assigned successfully");
-      setAssignSubjectId(0);
-      fetchSubjects();
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to assign subject");
-    }
-  };
-
-  const handleAddSession = async () => {
-    if (!lecturerId || !newSession.subject_id) return alert("Select a subject");
-    try {
-      await axios.post("http://localhost:5000/api/lecturer/sessions", {
-        ...newSession,
-        lecturer_id: lecturerId,
-      });
-      alert("Session created successfully");
-      setShowAddSession(false);
-      setNewSession({ subject_id: 0, assistant_id: 0, location_id: 1, date: "", start_time: "", end_time: "" });
-      fetchSessions();
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to create session");
-    }
-  };
-
-  const handleDeleteSession = async (id: number) => {
-    if (!confirm("Delete this session?")) return;
-    try {
-      await axios.delete(`http://localhost:5000/api/lecturer/sessions/${id}`);
-      fetchSessions();
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to delete session");
-    }
-  };
-
-  const handleViewAttendance = async (sessionId: number) => {
-    try {
-      const res = await axios.get<Attendance[]>(`http://localhost:5000/api/sessions/${sessionId}/attendance`);
-      setAttendanceList(res.data);
-      setSelectedSessionId(sessionId);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to fetch attendance");
-    }
-  };
+  // --- UI Components ---
+  
+  if (loading) return <div className="p-10 text-center">Loading Dashboard...</div>;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {/* Assign Subject */}
-      <div className="bg-white p-4 shadow rounded mb-6">
-        <h2 className="text-xl font-semibold mb-2">Assign Subject</h2>
-        <select
-          className="border p-2 mr-2"
-          value={assignSubjectId}
-          onChange={(e) => setAssignSubjectId(Number(e.target.value))}
-        >
-          <option value={0}>Select Subject</option>
-          {subjects.map(s => (
-            <option key={s.id} value={s.id}>
-              {s.subject_name} ({s.subject_code})
-            </option>
-          ))}
-        </select>
-        <button onClick={handleAssignSubject} className="px-3 py-1 bg-blue-600 text-white rounded">
-          Assign
-        </button>
+    <div className="min-h-screen bg-gray-50 p-8">
+      
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">Lecturer Dashboard</h1>
+        <p className="text-gray-500">Welcome back, here is your daily overview.</p>
       </div>
 
-      {/* Sessions List */}
-      <div className="bg-white p-4 shadow rounded mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-xl font-semibold">Sessions</h2>
-          <button onClick={() => setShowAddSession(true)} className="px-3 py-1 bg-green-600 text-white rounded">
-            Add Session
-          </button>
-        </div>
-        {sessions.length === 0 ? (
-          <p>No sessions scheduled yet.</p>
-        ) : (
-          <table className="min-w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-4 py-2">Subject</th>
-                <th className="border px-4 py-2">Date</th>
-                <th className="border px-4 py-2">Time</th>
-                <th className="border px-4 py-2">Assistant</th>
-                <th className="border px-4 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map(s => (
-                <tr key={s.id}>
-                  <td className="border px-4 py-2">{s.subject_name} ({s.subject_code})</td>
-                  <td className="border px-4 py-2">{new Date(s.date).toLocaleDateString()}</td>
-                  <td className="border px-4 py-2">{s.start_time} - {s.end_time}</td>
-                  <td className="border px-4 py-2">{s.assistant_name || "-"}</td>
-                  <td className="border px-4 py-2 text-center space-x-1">
-                    <button
-                      onClick={() => handleViewAttendance(s.id)}
-                      className="px-2 py-1 bg-blue-600 text-white rounded"
-                    >
-                      View Attendance
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSession(s.id)}
-                      className="px-2 py-1 bg-red-500 text-white rounded"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Attendance List */}
-      {selectedSessionId && (
-        <div className="bg-white p-4 shadow rounded mb-6">
-          <h3 className="text-xl font-semibold mb-2">Attendance for Session {selectedSessionId}</h3>
-          {attendanceList.length === 0 ? (
-            <p>No attendance records yet.</p>
-          ) : (
-            <table className="min-w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-200">
-                  <th className="border px-4 py-2">Student ID</th>
-                  <th className="border px-4 py-2">Student Name</th>
-                  <th className="border px-4 py-2">Status</th>
-                  <th className="border px-4 py-2">Scan Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {attendanceList.map(a => (
-                  <tr key={a.student_id}>
-                    <td className="border px-4 py-2">{a.student_id}</td>
-                    <td className="border px-4 py-2">{a.student_name}</td>
-                    <td className={`border px-4 py-2 font-semibold ${
-                      a.status === "present" ? "text-green-600" : 
-                      a.status === "absent" ? "text-red-600" : "text-gray-600"
-                    }`}>{a.status}</td>
-                    <td className="border px-4 py-2">{a.scan_time}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {/* Add Session Modal */}
-      {showAddSession && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow w-96">
-            <h3 className="text-xl font-semibold mb-4">Add Session</h3>
-
-            <select
-              className="w-full border p-2 mb-2"
-              value={newSession.subject_id}
-              onChange={e => setNewSession({ ...newSession, subject_id: Number(e.target.value) })}
-            >
-              <option value="">Select Subject</option>
-              {subjects.map(s => (
-                <option key={s.subject_id} value={s.subject_id}>
-                  {s.subject_name} ({s.subject_code})
-                </option>
-              ))}
-            </select>
-
-            <label className="block mb-2">Assistant (optional):</label>
-            <select
-              className="w-full border p-2 mb-2"
-              value={newSession.assistant_id}
-              onChange={e => setNewSession({...newSession, assistant_id: Number(e.target.value)})}
-            >
-              <option value={0}>Select Assistant</option>
-              {assistants.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-
-            <label className="block mb-2">Location:</label>
-            <select
-              className="w-full border p-2 mb-2"
-              value={newSession.location_id}
-              onChange={e => setNewSession({...newSession, location_id: Number(e.target.value)})}
-            >
-              {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-
-            <label className="block mb-2">Date:</label>
-            <input
-              type="date"
-              className="w-full border p-2 mb-2"
-              value={newSession.date}
-              onChange={e => setNewSession({...newSession, date: e.target.value})}
-            />
-
-            <label className="block mb-2">Start Time:</label>
-            <input
-              type="time"
-              className="w-full border p-2 mb-2"
-              value={newSession.start_time}
-              onChange={e => setNewSession({...newSession, start_time: e.target.value})}
-            />
-
-            <label className="block mb-2">End Time:</label>
-            <input
-              type="time"
-              className="w-full border p-2 mb-4"
-              value={newSession.end_time}
-              onChange={e => setNewSession({...newSession, end_time: e.target.value})}
-            />
-
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowAddSession(false)} className="px-3 py-1 bg-gray-400 rounded">Cancel</button>
-              <button onClick={handleAddSession} className="px-3 py-1 bg-green-600 text-white rounded">Add Session</button>
-            </div>
+      {/* --- STAT CARDS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        
+        {/* Card 1: Subjects */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
+          <div className="p-3 bg-blue-100 rounded-full mr-4">
+            <BookOpen className="text-blue-600 w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Assigned Subjects</p>
+            <h3 className="text-2xl font-bold text-gray-800">{stats.totalSubjects}</h3>
           </div>
         </div>
-      )}
+
+        {/* Card 2: Sessions */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
+          <div className="p-3 bg-purple-100 rounded-full mr-4">
+            <Calendar className="text-purple-600 w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Total Sessions</p>
+            <h3 className="text-2xl font-bold text-gray-800">{stats.totalSessions}</h3>
+          </div>
+        </div>
+
+        {/* Card 3: Students (Approx or Placeholder) */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
+          <div className="p-3 bg-green-100 rounded-full mr-4">
+            <Users className="text-green-600 w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Total Attendance</p>
+            {/* Sum of attendance from chart data as a quick stat */}
+            <h3 className="text-2xl font-bold text-gray-800">
+              {stats.chartData.reduce((acc, curr) => acc + curr.attendance_count, 0)}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      {/* --- MAIN CONTENT GRID --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* LEFT: CHART SECTION (Takes up 2 cols) */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-bold mb-6 text-gray-800">Attendance Overview</h3>
+          
+          {stats.chartData.length > 0 ? (
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="subject_code" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#9CA3AF', fontSize: 12}} 
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#9CA3AF', fontSize: 12}} 
+                  />
+                  <Tooltip 
+                    cursor={{fill: '#F3F4F6'}}
+                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                  />
+                  <Bar dataKey="attendance_count" name="Students Present" radius={[4, 4, 0, 0]}>
+                    {stats.chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "#4F46E5" : "#818CF8"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
+              No attendance data available for charts yet.
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: UPCOMING SESSIONS & ACTIONS (Takes up 1 col) */}
+        <div className="space-y-6">
+          
+          {/* Upcoming List */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 className="text-lg font-bold mb-4 text-gray-800">Upcoming Classes</h3>
+            <div className="space-y-4">
+              {stats.upcomingSessions.length === 0 ? (
+                <p className="text-sm text-gray-500">No upcoming classes.</p>
+              ) : (
+                stats.upcomingSessions.map((sess, idx) => (
+                  <div key={idx} className="flex items-center p-3 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-100">
+                    <div className="bg-blue-50 text-blue-600 font-bold p-3 rounded-lg text-xs flex flex-col items-center mr-3 w-14">
+                      <span>{new Date(sess.date).getDate()}</span>
+                      <span className="uppercase">{new Date(sess.date).toLocaleString('default', { month: 'short' })}</span>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-800 text-sm">{sess.subject_name}</h4>
+                      <p className="text-xs text-gray-500">{sess.start_time}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <button className="w-full mt-4 text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center justify-center">
+              View All Schedule <ArrowRight className="w-4 h-4 ml-1" />
+            </button>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-xl shadow-md text-white">
+            <h3 className="font-bold mb-2">Quick Actions</h3>
+            <p className="text-blue-100 text-sm mb-4">Manage your subjects and schedule easily.</p>
+            
+            <div className="space-y-2">
+              <button 
+                onClick={() => window.location.href='/lecturer/attendance'} // Update to your route
+                className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-sm py-2 px-4 rounded-lg flex items-center text-sm transition-all"
+              >
+                <PlusCircle className="w-4 h-4 mr-2" /> Add New Session
+              </button>
+              <button 
+                onClick={() => window.location.href='/lecturer/attendance'} // Update to your route
+                className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-sm py-2 px-4 rounded-lg flex items-center text-sm transition-all"
+              >
+                <BookOpen className="w-4 h-4 mr-2" /> Assign Subject
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }

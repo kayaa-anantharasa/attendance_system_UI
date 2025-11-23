@@ -26,8 +26,10 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
 
  const menuItems: MenuItem[] = [
   { name: "Dashboard", path: "/student/dashboard", icon: <FiHome /> },
+  { name: "Subjects", path: "/student/subjects", icon: <FiGrid /> },
   { name: "Sessions", path: "/student/session", icon: <FiLayers /> },
   { name: "Attendance", path: "/student/attendance", icon: <FiGrid /> },
+  { name: "Booking", path: "/student/booking", icon: <FiMapPin /> },
 ];
 
   useEffect(() => {
